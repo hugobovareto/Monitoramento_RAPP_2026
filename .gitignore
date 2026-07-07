@@ -1,0 +1,16 @@
+# Ambiente virtual
+venv/
+env/
+__pycache__/
+
+# Dados
+*.csv
+*.xlsx
+*.xls
+*.xlsb
+Resultados/
+Perfil_Estudante/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
