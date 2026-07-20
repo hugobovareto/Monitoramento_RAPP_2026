@@ -53,11 +53,32 @@ Exclusão de provas com tempo = 0.
 
 3) Relatórios de Acompanhamento de Turmas e Progressão Parcial.
 Para saber os estudantes enturmados e alguns que já estão aprovados (mesmo sem fazer a prova Plurall).
+Considerar somente com os componentes da Formação Geral Básica da BNCC (sem Ensino Religioso):
+- Arte;
+- Biologia;
+- Ciências;
+- Educação Física;
+- Filosofia;
+- Física;
+- Geografia;
+- História;
+- Língua Espanhola;
+- Língua Portuguesa;
+- Língua Inglesa;
+- Matemática;
+- Química;
+- Sociologia.
+
+
+Excluir duplicatas do df_enturmados, considerando as colunas 'MATRÍCULA' e 'COMPONENTE CURRICULAR'.
+Seguir o ordenamento de preferência:
+# SITUAÇÃO FINAL = APROVADO;
+# maior nota em MÉDIA FINAL.
 
 
 Tratamentos:
 Estudante é considerado enturmado se aparece no Relatório de Acompanhamento de Turmas e Progressão Parcial.
-Componente está aprovado se a nota (presenter no redash for >= 60).
+Componente está aprovado se a nota (presente no redash for >= 60).
 Estudante com 'SITUAÇÃO FINAL' = APROVADO no Relatório de Acompanhamento de Turmas e Progressão Parcial é considerado aprovado, mesmo que não tenha feito a prova Plurall.
 A nota desse estudante será a nota em 'MÉDIA FINAL'.
 
@@ -101,6 +122,7 @@ componentes_bncc = ['Arte',
                      'Sociologia']
 
 df_rapp = df_rapp[df_rapp['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
+
 
 # Manunteção somente das colunas de interesse
 df_rapp = df_rapp[['MATRÍCULA', 'NOME', 'COMPONENTE CURRICULAR', 'INEP ESCOLA', 'ESCOLA', 'SÉRIE', 'DIREC', 'ETAPA_RESUMIDA']]
@@ -176,7 +198,119 @@ for arquivo in tqdm(arquivos, desc="Processando arquivos"):
 # concatena todos em um único dataframe
 df_enturmados = pd.concat(dfs, ignore_index=True)
 
-# Adicionar coluna 'Enturmação' no df_merged, com valor 'Sim' se o estudante e componente estiver no df_enturmados, caso contrário 'Não'
+
+# Considerar somente os componentes da Formação Geral Básica da BNCC (sem Ensino Religioso):
+componentes_bncc = ['Arte',
+                     'Biologia',
+                     'Ciências',
+                     'Educação Física',
+                     'Filosofia',
+                     'Física',
+                     'Geografia',
+                     'História',
+                     'Língua Espanhola',
+                     'Língua Portuguesa',
+                     'Língua Inglesa',
+                     'Matemática',
+                     'Química',
+                     'Sociologia']
+
+df_enturmados = df_enturmados[df_enturmados['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
+
+
+# Criar a coluna 'ETAPA_RESUMIDA' no df_enturmados, com valores 'Ens. Fund. - Anos Finais' e 'Ensino Médio', de acordo com a Série
+# Criar a coluna 'ETAPA_RESUMIDA' a partir da SÉRIE
+mapeamento_etapa = {
+    '1ª SÉRIE': 'Ensino Médio',
+    '2ª SÉRIE': 'Ensino Médio',
+    '3ª SÉRIE': 'Ensino Médio',
+    '6º ANO': 'Ens. Fund. - Anos Finais',
+    '7º ANO': 'Ens. Fund. - Anos Finais',
+    '8º ANO': 'Ens. Fund. - Anos Finais',
+    '9º ANO': 'Ens. Fund. - Anos Finais',
+    'TURMA I (6° E 7° ANOS)': 'Ens. Fund. - Anos Finais',
+    'TURMA II (8° E 9° ANOS)': 'Ens. Fund. - Anos Finais'
+}
+
+df_enturmados['ETAPA_RESUMIDA'] = df_enturmados['SÉRIE'].map(mapeamento_etapa)
+
+# Excluir duplicatas do df_enturmados, considerando as colunas 'MATRÍCULA' e 'COMPONENTE CURRICULAR'.
+# Seguir o ordenamento de preferência:
+# SITUAÇÃO FINAL = APROVADO;
+# maior nota em MÉDIA FINAL.
+
+# Garante que MÉDIA FINAL é numérica
+df_enturmados['MÉDIA FINAL'] = pd.to_numeric(
+    df_enturmados['MÉDIA FINAL'],
+    errors='coerce'
+)
+
+# Cria a prioridade (1 = APROVADO, 0 = demais)
+df_enturmados['_prioridade'] = (
+    df_enturmados['SITUAÇÃO FINAL']
+    .eq('APROVADO')
+    .astype(int)
+)
+
+# Ordena pelos critérios
+df_enturmados = (
+    df_enturmados
+    .sort_values(
+        by=['_prioridade', 'MÉDIA FINAL'],
+        ascending=[False, False]
+    )
+    .drop_duplicates(
+        subset=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+        keep='first'
+    )
+    .drop(columns='_prioridade')
+    .reset_index(drop=True)
+)
+
+
+# Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
+df_merged['MATRÍCULA'] = (
+    df_merged['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+df_enturmados['MATRÍCULA'] = (
+    df_enturmados['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+
+
+# Merge entre o df_merged e df_enturmados, considerando a chave 'MATRÍCULA' e 'COMPONENTE CURRICULAR'
+# Merge externo (outer) para manter todos os registros de ambos os dataframes
+df_final = df_merged.merge(
+    df_enturmados,
+    on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+    how='outer',
+    suffixes=('', '_ent')
+)
+
+# Identifica as linhas que vieram somente do df_enturmados
+novas_linhas = df_final['NOME'].isna()
+
+# Preenche as colunas do df_merged com as informações equivalentes do df_enturmados
+df_final.loc[novas_linhas, 'NOME'] = df_final.loc[novas_linhas, 'ESTUDANTE']
+df_final.loc[novas_linhas, 'INEP ESCOLA'] = df_final.loc[novas_linhas, 'INEP ESCOLA_ent']
+df_final.loc[novas_linhas, 'ESCOLA'] = df_final.loc[novas_linhas, 'ESCOLA_ent']
+df_final.loc[novas_linhas, 'SÉRIE'] = df_final.loc[novas_linhas, 'SÉRIE_ent']
+df_final.loc[novas_linhas, 'DIREC'] = df_final.loc[novas_linhas, 'DIREC_ent']
+df_final.loc[novas_linhas, 'ETAPA_RESUMIDA'] = df_final.loc[novas_linhas, 'ETAPA_RESUMIDA_ent']
+
+# Situação para os novos registros
+df_final.loc[novas_linhas, 'Situação'] = 'Não Avaliado'
+
+# Mantém somente as colunas do df_merged
+df_final = df_final[df_merged.columns]
+
+
+# Adicionar coluna 'Enturmação' no df_final, com valor 'Sim' se o estudante e componente estiver no df_enturmados, caso contrário 'Não'
 # Selecionar apenas as chaves do df_enturmados
 df_enturmados_merge = (
     df_enturmados[['MATRÍCULA', 'COMPONENTE CURRICULAR']]
@@ -185,8 +319,8 @@ df_enturmados_merge = (
 )
 
 # Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
-df_merged['MATRÍCULA'] = (
-    df_merged['MATRÍCULA']
+df_final['MATRÍCULA'] = (
+    df_final['MATRÍCULA']
     .astype(str)
     .str.strip()
 )
@@ -204,20 +338,20 @@ df_enturmados_merge['MATRÍCULA'] = (
 )
 
 # Merge
-df_merged = df_merged.merge(
+df_final = df_final.merge(
     df_enturmados_merge,
     on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
     how='left'
 )
 
 # Preencher os que não foram encontrados
-df_merged['Enturmação'] = df_merged['Enturmação'].fillna('Não')
+df_final['Enturmação'] = df_final['Enturmação'].fillna('Não')
 
 
 # Estudante com 'SITUAÇÃO FINAL' = APROVADO no df_enturmados é considerado aprovado, mesmo que não tenha feito a prova Plurall.
 # A nota desse estudante será a nota que está em 'MÉDIA FINAL'.
 # Trazer informações do df_enturmados
-df_merged = df_merged.merge(
+df_final = df_final.merge(
     df_enturmados[
         ['MATRÍCULA', 'COMPONENTE CURRICULAR', 'SITUAÇÃO FINAL', 'MÉDIA FINAL']
     ].drop_duplicates(),
@@ -225,33 +359,34 @@ df_merged = df_merged.merge(
     how='left'
 )
 
+
 # Máscara dos aprovados
-mask = df_merged['SITUAÇÃO FINAL'].eq('APROVADO')
+mask = df_final['SITUAÇÃO FINAL'].eq('APROVADO')
 
 # Converter 'MÉDIA FINAL' para numérico
-df_merged['MÉDIA FINAL'] = (
-    df_merged['MÉDIA FINAL']
+df_final['MÉDIA FINAL'] = (
+    df_final['MÉDIA FINAL']
     .str.replace(',', '.', regex=False)
 )
 
-df_merged['MÉDIA FINAL'] = pd.to_numeric(
-    df_merged['MÉDIA FINAL'],
+df_final['MÉDIA FINAL'] = pd.to_numeric(
+    df_final['MÉDIA FINAL'],
     errors='coerce'
 )
 
 # Multiplicar por 10 para ficar na mesma escala de 'rendimento (%)'
-df_merged['MÉDIA FINAL'] = df_merged['MÉDIA FINAL'] * 10
+df_final['MÉDIA FINAL'] = df_final['MÉDIA FINAL'] * 10
 
 
-# Atualizar nota e situação do df_merged para os estudantes aprovados no df_enturmados
-df_merged.loc[mask, 'rendimento (%)'] = df_merged.loc[mask, 'MÉDIA FINAL']
-df_merged.loc[mask, 'Situação'] = 'Aprovado'
+# Atualizar nota e situação do df_final para os estudantes aprovados no df_enturmados
+df_final.loc[mask, 'rendimento (%)'] = df_final.loc[mask, 'MÉDIA FINAL']
+df_final.loc[mask, 'Situação'] = 'Aprovado'
 
 # Excluir as colunas 'SITUAÇÃO FINAL' e 'MÉDIA FINAL' do df_merged
-df_merged = df_merged.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
+df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260709_Monitoramento_RAPP.xlsx", index=False)
+df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260720_Monitoramento_RAPP.xlsx", index=False)
 
 
 
@@ -270,6 +405,342 @@ df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260709_Moni
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################
+'''
+MONITORAMENTO DE ENTURMAÇÃO DOS ESTUDANTES EM RAPP
+Gerar uma planilha com quantitativo de estudantes (não considera granulação por componente).
+Colunas:
+DIREC;
+Escolas iniciais;
+Alunos iniciais;
+Alunos enturmados;
+Alunos aprovados;
+Total alunos (inicial e enturmados);
+% enturmados;
+# faltam enturmar.
+
+Para além do quadro acima, a planilha terá outras abas:
+Total (lista com todos os componentes de estudantes em RAPP inicial + enturmados);
+Inicial (lista com componentes iniciais de estudantes em RAPP, de acordo com base do GPD e tratamentos);
+Enturmados (lista com componentes enturmados, de acordo com Relatórios de Acompanhamento de Turmas e Progressão Parcial);
+Quadro (dados expostos acima)
+
+Se o estudante aparece nos Relatórios de Acompanhamento de Turmas e Progressão Parcial, ele é considerado enturmado.
+Os valores tidos como 'inicial' são os referentes à base geral de estudantes em RAPP (advinda do GPD e após tratamentos).
+
+Tratamentos:
+Estudante é considerado enturmado se aparece no Relatório de Acompanhamento de Turmas e Progressão Parcial.
+Componente está aprovado se a nota (presente no redash for >= 60).
+Estudante com 'SITUAÇÃO FINAL' = APROVADO no Relatório de Acompanhamento de Turmas e Progressão Parcial é considerado aprovado, mesmo que não tenha feito a prova Plurall.
+A nota desse estudante será a nota em 'MÉDIA FINAL'.
+
+Excluir duplicatas do df_enturmados, considerando as colunas 'MATRÍCULA' e 'COMPONENTE CURRICULAR'.
+Seguir o ordenamento de preferência:
+# SITUAÇÃO FINAL = APROVADO;
+# maior nota em MÉDIA FINAL.
+
+
+Os dados incluem estudantes de regular e EPT.
+'''
+
+# Carregar os dados gerais dos estudantes em RAPP 
+df_rapp = pd.read_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260625_GERAL_analises_RAPP.xlsx", sheet_name="Base RAPP")
+
+
+# Manunteção somente das colunas de interesse
+df_rapp = df_rapp[['MATRÍCULA', 'NOME', 'COMPONENTE CURRICULAR', 'INEP ESCOLA', 'ESCOLA', 'SÉRIE', 'DIREC', 'ETAPA ENSINO']]
+
+# Carregar dados dos Relatórios de Acompanhamento de Turmas e Progressão Parcial para saber quantitativo de enturmados e aprovados
+# caminho da pasta onde estão os arquivos
+pasta = r"C:\Users\hugob\Downloads\Enturmados_RAPP_2026"
+
+# lista todos os arquivos .xlsx da pasta
+arquivos = glob.glob(os.path.join(pasta, "*.xlsx"))
+
+# lista para armazenar os dataframes
+dfs = []
+
+for arquivo in tqdm(arquivos, desc="Processando arquivos"):
+    # lê cada arquivo, pulando as 2 primeiras linhas
+    df_unico = pd.read_excel(arquivo, skiprows=2)
+    dfs.append(df_unico)
+
+# concatena todos em um único dataframe
+df_enturmados = pd.concat(dfs, ignore_index=True)
+
+
+# Excluir duplicatas do df_enturmados, considerando as colunas 'MATRÍCULA' e 'COMPONENTE CURRICULAR'.
+# Seguir o ordenamento de preferência:
+# SITUAÇÃO FINAL = APROVADO;
+# maior nota em MÉDIA FINAL.
+
+# Criar uma cópia do dataframe original
+df_enturmados_final = df_enturmados.copy()
+
+
+# Garante que MÉDIA FINAL é numérica
+df_enturmados_final['MÉDIA FINAL'] = pd.to_numeric(
+    df_enturmados_final['MÉDIA FINAL'],
+    errors='coerce'
+)
+
+# Cria a prioridade (1 = APROVADO, 0 = demais)
+df_enturmados_final['_prioridade'] = (
+    df_enturmados_final['SITUAÇÃO FINAL']
+    .eq('APROVADO')
+    .astype(int)
+)
+
+# Ordena pelos critérios
+df_enturmados_final = (
+    df_enturmados_final
+    .sort_values(
+        by=['_prioridade', 'MÉDIA FINAL'],
+        ascending=[False, False]
+    )
+    .drop_duplicates(
+        subset=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+        keep='first'
+    )
+    .drop(columns='_prioridade')
+    .reset_index(drop=True)
+)
+
+
+# Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
+df_rapp['MATRÍCULA'] = (
+    df_rapp['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+df_enturmados_final['MATRÍCULA'] = (
+    df_enturmados_final['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+
+# Merge entre o df_rapp e df_enturmados_final, considerando a chave 'MATRÍCULA' e 'COMPONENTE CURRICULAR'
+# Merge externo (outer) para manter todos os registros de ambos os dataframes
+df_total = df_rapp.merge(
+    df_enturmados_final,
+    on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+    how='outer',
+    suffixes=('', '_ent')
+)
+
+# Identifica as linhas que vieram somente do df_enturmados
+novas_linhas = df_total['NOME'].isna()
+
+# Preenche as colunas do df_merged com as informações equivalentes do df_enturmados
+df_total.loc[novas_linhas, 'NOME'] = df_total.loc[novas_linhas, 'ESTUDANTE']
+df_total.loc[novas_linhas, 'INEP ESCOLA'] = df_total.loc[novas_linhas, 'INEP ESCOLA_ent']
+df_total.loc[novas_linhas, 'ESCOLA'] = df_total.loc[novas_linhas, 'ESCOLA_ent']
+df_total.loc[novas_linhas, 'SÉRIE'] = df_total.loc[novas_linhas, 'SÉRIE_ent']
+df_total.loc[novas_linhas, 'DIREC'] = df_total.loc[novas_linhas, 'DIREC_ent']
+
+# Situação para os novos registros
+df_total.loc[novas_linhas, 'Situação'] = 'Não Avaliado'
+
+# Mantém somente as colunas do df_rapp
+df_total = df_total[df_rapp.columns]
+
+
+# Adicionar coluna 'Enturmação' no df_total, com valor 'Sim' se o estudante e componente estiver no df_enturmados_final, caso contrário 'Não'
+# Selecionar apenas as chaves do df_enturmados
+df_enturmados_merge = (
+    df_enturmados_final[['MATRÍCULA', 'COMPONENTE CURRICULAR']]
+    .drop_duplicates()
+    .assign(Enturmação='Sim')
+)
+
+# Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
+df_total['MATRÍCULA'] = (
+    df_total['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+df_enturmados_final['MATRÍCULA'] = (
+    df_enturmados_final['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+df_enturmados_merge['MATRÍCULA'] = (
+    df_enturmados_merge['MATRÍCULA']
+    .astype(str)
+    .str.strip()
+)
+
+# Merge
+df_total = df_total.merge(
+    df_enturmados_merge,
+    on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+    how='left'
+)
+
+# Preencher os que não foram encontrados
+df_total['Enturmação'] = df_total['Enturmação'].fillna('Não')
+
+
+# Estudante com 'SITUAÇÃO FINAL' = APROVADO no df_enturmados_final é considerado aprovado, mesmo que não tenha feito a prova Plurall.
+# A nota desse estudante será a nota que está em 'MÉDIA FINAL'.
+# Trazer informações do df_enturmados
+df_total = df_total.merge(
+    df_enturmados_final[
+        ['MATRÍCULA', 'COMPONENTE CURRICULAR', 'SITUAÇÃO FINAL', 'MÉDIA FINAL']
+    ].drop_duplicates(),
+    on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+    how='left'
+)
+
+print(df_total['MÉDIA FINAL'].dtype)
+# Máscara dos aprovados
+mask = df_total['SITUAÇÃO FINAL'].eq('APROVADO')
+
+# Converter 'MÉDIA FINAL' para numérico
+df_total['MÉDIA FINAL'] = pd.to_numeric(
+    df_total['MÉDIA FINAL'],
+    errors='coerce'
+)
+
+# Multiplicar por 10 para ficar na mesma escala de 'rendimento (%)'
+df_total['MÉDIA FINAL'] = df_total['MÉDIA FINAL'] * 10
+
+
+# Atualizar nota e situação do df_final para os estudantes aprovados no df_enturmados
+df_total.loc[mask, 'rendimento (%)'] = df_total.loc[mask, 'MÉDIA FINAL']
+df_total.loc[mask, 'Situação'] = 'Aprovado'
+
+# Excluir as colunas 'SITUAÇÃO FINAL' e 'MÉDIA FINAL' do df_merged
+df_total = df_total.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
+
+
+# Excluir coluna 'rendimento (%)' do df_total
+df_total = df_total.drop(columns=['rendimento (%)'])
+
+
+# Criar um arquivo em excel com as abas de df_total; df_rapp; df_enturmados e uma tabela com informações por DIREC
+# Colunas da aba Tabela: DIREC; Escolas iniciais; Alunos iniciais; Alunos enturmados; Alunos aprovados; Total alunos (inicial e enturmados); % enturmados; # faltam enturmar.
+'''
+Cada coluna tem os valores:
+DIREC: uma linha para cada valor presente na coluna df_total['DIREC']
+
+Escolas Iniciais: total de valores únicos de 'INEP ESCOLA' para cada 'DIREC' no df_rapp;
+
+Alunos Iniciais: total de valores únicos de 'MATRÍCULA' para cada 'DIREC' no df_rapp;
+
+Alunos Enturmados: total de valores únicos de 'MATRÍCULA' para cada 'DIREC' no df_total que possuem a coluna 'Enturmação' = Sim;
+
+Alunos Aprovados: total de valores únicos de 'MATRÍCULA' para cada 'DIREC' no df_total que possuem a coluna 'Situação' = Aprovado;
+
+Total Alunos (inicial e enturmados): total de valores únicos de 'MATRÍCULA' para cada 'DIREC' no df_total 
+
+% Enturmados: Alunos Enturmados / Total Alunos (inicial e enturmados)
+
+Faltam Enturmar: Total Alunos (inicial e enturmados) menos Alunos Enturmados
+'''
+
+# Lista de DIRECs
+resumo_direc = pd.DataFrame({
+    'DIREC': sorted(df_total['DIREC'].dropna().unique())
+})
+
+# Escolas Iniciais (df_rapp)
+escolas_iniciais = (
+    df_rapp.groupby('DIREC')['INEP ESCOLA']
+    .nunique()
+    .rename('Escolas Iniciais')
+)
+
+# Alunos Iniciais (df_rapp)
+alunos_iniciais = (
+    df_rapp.groupby('DIREC')['MATRÍCULA']
+    .nunique()
+    .rename('Alunos Iniciais')
+)
+
+# Alunos Enturmados (df_total)
+alunos_enturmados = (
+    df_total[df_total['Enturmação'].eq('Sim')]
+    .groupby('DIREC')['MATRÍCULA']
+    .nunique()
+    .rename('Alunos Enturmados')
+)
+
+# Alunos Aprovados (df_total)
+alunos_aprovados = (
+    df_total[df_total['Situação'].eq('Aprovado')]
+    .groupby('DIREC')['MATRÍCULA']
+    .nunique()
+    .rename('Alunos Aprovados')
+)
+
+# Total de alunos (df_total)
+total_alunos = (
+    df_total.groupby('DIREC')['MATRÍCULA']
+    .nunique()
+    .rename('Total Alunos')
+)
+
+# Juntar tudo
+resumo_direc = (
+    resumo_direc
+    .merge(escolas_iniciais, on='DIREC', how='left')
+    .merge(alunos_iniciais, on='DIREC', how='left')
+    .merge(alunos_enturmados, on='DIREC', how='left')
+    .merge(alunos_aprovados, on='DIREC', how='left')
+    .merge(total_alunos, on='DIREC', how='left')
+)
+
+# Preencher NaN com 0 nas colunas numéricas
+cols = [
+    'Escolas Iniciais',
+    'Alunos Iniciais',
+    'Alunos Enturmados',
+    'Alunos Aprovados',
+    'Total Alunos'
+]
+
+resumo_direc[cols] = resumo_direc[cols].fillna(0).astype(int)
+
+# Indicadores finais
+resumo_direc['% Enturmados'] = (
+    resumo_direc['Alunos Enturmados']
+    / resumo_direc['Total Alunos']
+)
+
+resumo_direc['Faltam Enturmar'] = (
+    resumo_direc['Total Alunos']
+    - resumo_direc['Alunos Enturmados']
+)
+
+# (Opcional) Formatar o percentual
+resumo_direc['% Enturmados'] = (
+    resumo_direc['% Enturmados'] * 100
+).round(1)
+
+
+# Salvar em Excel os dataframes e tabela com informações por DIREC
+with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260720_Enturmação.xlsx") as writer:
+    df_total.to_excel(writer, sheet_name='Total', index=False)
+    df_rapp.to_excel(writer, sheet_name='Inicial', index=False)
+    df_enturmados.to_excel(writer, sheet_name='Enturmados', index=False)
+    resumo_direc.to_excel(writer, sheet_name='Tabela', index=False)
 
 
 
