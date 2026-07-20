@@ -229,7 +229,15 @@ mapeamento_etapa = {
     '8º ANO': 'Ens. Fund. - Anos Finais',
     '9º ANO': 'Ens. Fund. - Anos Finais',
     'TURMA I (6° E 7° ANOS)': 'Ens. Fund. - Anos Finais',
-    'TURMA II (8° E 9° ANOS)': 'Ens. Fund. - Anos Finais'
+    'TURMA II (8° E 9° ANOS)': 'Ens. Fund. - Anos Finais',
+    '1º Período (1ª Série)': 'Ensino Médio',
+    '2º Período (2ª Série)': 'Ensino Médio',
+    '3º Período (3ª Série)': 'Ensino Médio',
+    '3° PERÍODO': 'Ensino Médio',
+    '1º MÓDULO': 'Ensino Médio',
+    '3º MÓDULO': 'Ensino Médio',
+    'BLOCO B': 'Ensino Médio',
+    '5º PERÍODO (8° E 9° ANO - ANOS FINAIS)': 'Ens. Fund. - Anos Finais'
 }
 
 df_enturmados['ETAPA_RESUMIDA'] = df_enturmados['SÉRIE'].map(mapeamento_etapa)
