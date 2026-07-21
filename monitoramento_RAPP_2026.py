@@ -217,7 +217,7 @@ componentes_bncc = ['Arte',
 
 df_enturmados = df_enturmados[df_enturmados['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
 
-
+df_enturmados['SÉRIE'].value_counts()
 # Criar a coluna 'ETAPA_RESUMIDA' no df_enturmados, com valores 'Ens. Fund. - Anos Finais' e 'Ensino Médio', de acordo com a Série
 # Criar a coluna 'ETAPA_RESUMIDA' a partir da SÉRIE
 mapeamento_etapa = {
@@ -235,9 +235,14 @@ mapeamento_etapa = {
     '3º Período (3ª Série)': 'Ensino Médio',
     '3° PERÍODO': 'Ensino Médio',
     '1º MÓDULO': 'Ensino Médio',
+    '2º MODULO': 'Ensino Médio',
     '3º MÓDULO': 'Ensino Médio',
     'BLOCO B': 'Ensino Médio',
-    '5º PERÍODO (8° E 9° ANO - ANOS FINAIS)': 'Ens. Fund. - Anos Finais'
+    'BLOCO C': 'Ensino Médio',
+    '5º PERÍODO (8° E 9° ANO - ANOS FINAIS)': 'Ens. Fund. - Anos Finais',
+    '4º PERÍODO (6° E 7° ANO - ANOS FINAIS)': 'Ens. Fund. - Anos Finais',
+    '2º SEMESTRE': 'Ensino Médio',
+    'UNICA': 'Ens. Fund. - Anos Finais'
 }
 
 df_enturmados['ETAPA_RESUMIDA'] = df_enturmados['SÉRIE'].map(mapeamento_etapa)
@@ -372,11 +377,6 @@ df_final = df_final.merge(
 mask = df_final['SITUAÇÃO FINAL'].eq('APROVADO')
 
 # Converter 'MÉDIA FINAL' para numérico
-df_final['MÉDIA FINAL'] = (
-    df_final['MÉDIA FINAL']
-    .str.replace(',', '.', regex=False)
-)
-
 df_final['MÉDIA FINAL'] = pd.to_numeric(
     df_final['MÉDIA FINAL'],
     errors='coerce'
@@ -394,7 +394,7 @@ df_final.loc[mask, 'Situação'] = 'Aprovado'
 df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260720_Monitoramento_RAPP.xlsx", index=False)
+df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260721_Monitoramento_RAPP.xlsx", index=False)
 
 
 
@@ -450,7 +450,6 @@ Os valores tidos como 'inicial' são os referentes à base geral de estudantes e
 
 Tratamentos:
 Estudante é considerado enturmado se aparece no Relatório de Acompanhamento de Turmas e Progressão Parcial.
-Componente está aprovado se a nota (presente no redash for >= 60).
 Estudante com 'SITUAÇÃO FINAL' = APROVADO no Relatório de Acompanhamento de Turmas e Progressão Parcial é considerado aprovado, mesmo que não tenha feito a prova Plurall.
 A nota desse estudante será a nota em 'MÉDIA FINAL'.
 
@@ -462,6 +461,17 @@ Seguir o ordenamento de preferência:
 
 Os dados incluem estudantes de regular e EPT.
 '''
+# Importação das bibliotecas
+import pandas as pd
+import glob
+import os
+from tqdm import tqdm  # Para barra de progresso
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
+import openpyxl
+import re
+
 
 # Carregar os dados gerais dos estudantes em RAPP 
 df_rapp = pd.read_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260625_GERAL_analises_RAPP.xlsx", sheet_name="Base RAPP")
@@ -744,7 +754,7 @@ resumo_direc['% Enturmados'] = (
 
 
 # Salvar em Excel os dataframes e tabela com informações por DIREC
-with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260720_Enturmação.xlsx") as writer:
+with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260721_Enturmação.xlsx") as writer:
     df_total.to_excel(writer, sheet_name='Total', index=False)
     df_rapp.to_excel(writer, sheet_name='Inicial', index=False)
     df_enturmados.to_excel(writer, sheet_name='Enturmados', index=False)
