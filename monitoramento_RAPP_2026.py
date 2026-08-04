@@ -172,12 +172,12 @@ df_merged = df_merged.drop(columns=['prova'])
 
 # Adicionar coluna de Situação de acordo com a nota do estudante
 # >=60: Aprovado;
-# < 60: Reprovado;
+# < 60: Não Aprovado;
 # NaN: Não Avaliado.
 df_merged['Situação'] = df_merged['rendimento (%)'].apply(
     lambda x: 'Não Avaliado' if pd.isna(x)
     else 'Aprovado' if x >= 60
-    else 'Reprovado'
+    else 'Não Aprovado'
 )
 
 # Carregar dados dos Relatórios de Acompanhamento de Turmas e Progressão Parcial para saber enturmação e nota dos aprovados
@@ -874,12 +874,12 @@ df_merged = df_merged.drop(columns=['prova'])
 
 # Adicionar coluna de Situação de acordo com a nota do estudante
 # >=60: Aprovado;
-# < 60: Reprovado;
+# < 60: Não Aprovado;
 # NaN: Não Avaliado.
 df_merged['Situação'] = df_merged['rendimento (%)'].apply(
     lambda x: 'Não Avaliado' if pd.isna(x)
     else 'Aprovado' if x >= 60
-    else 'Reprovado'
+    else 'Não Aprovado'
 )
 
 # Carregar dados dos Relatórios de Acompanhamento de Turmas e Progressão Parcial para saber enturmação e nota dos aprovados
@@ -1081,7 +1081,7 @@ df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 # Inserção de informações de 2026
 # Dataframe com os dados do Relatório Geral de Matrículas de 2026
-df_geral_2026 = pd.read_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260724_2026_Relatório Geral de Estudantes - Matrículas.xlsx", skiprows=2)
+df_geral_2026 = pd.read_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260729_2026_Relatório Geral de Estudantes - Matrículas.xlsx", skiprows=2)
 
 # Converter MATRÍCULA para string no df_geral_2026 para garantir que a junção funcione corretamente
 df_geral_2026['MATRÍCULA'] = (
@@ -1131,8 +1131,8 @@ df_final = df_final.merge(
 )
 
 
-# Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260724_Total_RAPP.xlsx", index=False)
+# Exportar a base final em Excel
+df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260729_Total_RAPP.xlsx", index=False)
 
 
 
