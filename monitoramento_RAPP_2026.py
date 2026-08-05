@@ -129,7 +129,7 @@ df_rapp = df_rapp[['MATRÍCULA', 'NOME', 'COMPONENTE CURRICULAR', 'INEP ESCOLA',
 
 
 # Carregar dados do Redash (para ter nota e tempo de prova do estudante)
-df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RPP_-_Avaliações_em_andamento_2025_12_19.csv")
+df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RPP_-_Avaliações_em_andamento_2026_08_05.csv")
 
 # Excluir valores que o tempo de prova foi 0 (zero) ou nulo
 df_redash = df_redash[
@@ -217,7 +217,6 @@ componentes_bncc = ['Arte',
 
 df_enturmados = df_enturmados[df_enturmados['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
 
-df_enturmados['SÉRIE'].value_counts()
 # Criar a coluna 'ETAPA_RESUMIDA' no df_enturmados, com valores 'Ens. Fund. - Anos Finais' e 'Ensino Médio', de acordo com a Série
 # Criar a coluna 'ETAPA_RESUMIDA' a partir da SÉRIE
 mapeamento_etapa = {
@@ -247,6 +246,7 @@ mapeamento_etapa = {
 
 df_enturmados['ETAPA_RESUMIDA'] = df_enturmados['SÉRIE'].map(mapeamento_etapa)
 
+
 # Excluir duplicatas do df_enturmados, considerando as colunas 'MATRÍCULA' e 'COMPONENTE CURRICULAR'.
 # Seguir o ordenamento de preferência:
 # SITUAÇÃO FINAL = APROVADO;
@@ -254,7 +254,7 @@ df_enturmados['ETAPA_RESUMIDA'] = df_enturmados['SÉRIE'].map(mapeamento_etapa)
 
 # Garante que MÉDIA FINAL é numérica
 df_enturmados['MÉDIA FINAL'] = pd.to_numeric(
-    df_enturmados['MÉDIA FINAL'],
+    df_enturmados['MÉDIA FINAL'].str.replace(',', '.', regex=False),
     errors='coerce'
 )
 
@@ -378,7 +378,7 @@ mask = df_final['SITUAÇÃO FINAL'].eq('APROVADO')
 
 # Converter 'MÉDIA FINAL' para numérico
 df_final['MÉDIA FINAL'] = pd.to_numeric(
-    df_final['MÉDIA FINAL'],
+    df_final['MÉDIA FINAL'].str.replace(',', '.', regex=False),
     errors='coerce'
 )
 
@@ -394,10 +394,7 @@ df_final.loc[mask, 'Situação'] = 'Aprovado'
 df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260723_Monitoramento_RAPP.xlsx", index=False)
-
-
-
+df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260805_Monitoramento_RAPP.xlsx", index=False)
 
 
 
