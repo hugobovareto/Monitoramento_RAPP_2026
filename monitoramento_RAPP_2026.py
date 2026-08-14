@@ -128,58 +128,6 @@ df_rapp = df_rapp[df_rapp['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
 df_rapp = df_rapp[['MATRÍCULA', 'NOME', 'COMPONENTE CURRICULAR', 'INEP ESCOLA', 'ESCOLA', 'SÉRIE', 'DIREC', 'ETAPA_RESUMIDA']]
 
 
-# Carregar dados do Redash (para ter nota e tempo de prova do estudante)
-df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RPP_-_Avaliações_em_andamento_2026_08_05.csv")
-
-# Excluir valores que o tempo de prova foi 0 (zero) ou nulo
-df_redash = df_redash[
-    df_redash['tempo de prova'].notna() &
-    (df_redash['tempo de prova'].str.strip() != '') &
-    (df_redash['tempo de prova'] != '00:00:00')
-]
-
-# Criar a coluna 'MATRÍCULA' no df_redash, extraindo a matrícula do email do estudante
-df_redash['MATRÍCULA'] = df_redash['email_aluno'].str.split('@').str[0]
-
-# De acordo com a matrícula (extraída do email) e componente, juntar as informações de nota e tempo de prova do Redash com a base geral de estudantes em RAPP
-# Selecionar as colunas de interesse do df_redash
-df_redash_merge = df_redash[['MATRÍCULA', 'prova', 'rendimento (%)', 'tempo de prova']]
-
-# Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
-df_rapp["MATRÍCULA"] = (
-    df_rapp["MATRÍCULA"]
-    .astype("string")
-    .str.strip()
-)
-
-df_redash_merge["MATRÍCULA"] = (
-    df_redash_merge["MATRÍCULA"]
-    .astype("string")
-    .str.strip()
-)
-
-# Merge
-df_merged = df_rapp.merge(
-    df_redash_merge,
-    left_on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
-    right_on=['MATRÍCULA', 'prova'],
-    how='left'
-)
-
-# Remover as colunas duplicadas vindas do Redash
-df_merged = df_merged.drop(columns=['prova'])
-
-
-# Adicionar coluna de Situação de acordo com a nota do estudante
-# >=60: Aprovado;
-# < 60: Não Aprovado;
-# NaN: Não Avaliado.
-df_merged['Situação'] = df_merged['rendimento (%)'].apply(
-    lambda x: 'Não Avaliado' if pd.isna(x)
-    else 'Aprovado' if x >= 60
-    else 'Não Aprovado'
-)
-
 # Carregar dados dos Relatórios de Acompanhamento de Turmas e Progressão Parcial para saber enturmação e nota dos aprovados
 # caminho da pasta onde estão os arquivos
 pasta = r"C:\Users\hugob\Downloads\Enturmados_RAPP_2026"
@@ -282,8 +230,8 @@ df_enturmados = (
 
 
 # Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
-df_merged['MATRÍCULA'] = (
-    df_merged['MATRÍCULA']
+df_rapp['MATRÍCULA'] = (
+    df_rapp['MATRÍCULA']
     .astype(str)
     .str.strip()
 )
@@ -295,10 +243,9 @@ df_enturmados['MATRÍCULA'] = (
 )
 
 
-
-# Merge entre o df_merged e df_enturmados, considerando a chave 'MATRÍCULA' e 'COMPONENTE CURRICULAR'
+# Merge entre o df_rapp e df_enturmados, considerando a chave 'MATRÍCULA' e 'COMPONENTE CURRICULAR'
 # Merge externo (outer) para manter todos os registros de ambos os dataframes
-df_final = df_merged.merge(
+df_final = df_rapp.merge(
     df_enturmados,
     on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
     how='outer',
@@ -308,7 +255,7 @@ df_final = df_merged.merge(
 # Identifica as linhas que vieram somente do df_enturmados
 novas_linhas = df_final['NOME'].isna()
 
-# Preenche as colunas do df_merged com as informações equivalentes do df_enturmados
+# Preenche as colunas do df_rapp com as informações equivalentes do df_enturmados
 df_final.loc[novas_linhas, 'NOME'] = df_final.loc[novas_linhas, 'ESTUDANTE']
 df_final.loc[novas_linhas, 'INEP ESCOLA'] = df_final.loc[novas_linhas, 'INEP ESCOLA_ent']
 df_final.loc[novas_linhas, 'ESCOLA'] = df_final.loc[novas_linhas, 'ESCOLA_ent']
@@ -319,8 +266,8 @@ df_final.loc[novas_linhas, 'ETAPA_RESUMIDA'] = df_final.loc[novas_linhas, 'ETAPA
 # Situação para os novos registros
 df_final.loc[novas_linhas, 'Situação'] = 'Não Avaliado'
 
-# Mantém somente as colunas do df_merged
-df_final = df_final[df_merged.columns]
+# Mantém somente as colunas do df_rapp
+df_final = df_final[df_rapp.columns.tolist() + ['Situação']]
 
 
 # Adicionar coluna 'Enturmação' no df_final, com valor 'Sim' se o estudante e componente estiver no df_enturmados, caso contrário 'Não'
@@ -376,9 +323,10 @@ df_final = df_final.merge(
 # Máscara dos aprovados
 mask = df_final['SITUAÇÃO FINAL'].eq('APROVADO')
 
+
 # Converter 'MÉDIA FINAL' para numérico
 df_final['MÉDIA FINAL'] = pd.to_numeric(
-    df_final['MÉDIA FINAL'].str.replace(',', '.', regex=False),
+    df_final['MÉDIA FINAL'].astype(str).str.replace(',', '.', regex=False),
     errors='coerce'
 )
 
@@ -390,11 +338,118 @@ df_final['MÉDIA FINAL'] = df_final['MÉDIA FINAL'] * 10
 df_final.loc[mask, 'rendimento (%)'] = df_final.loc[mask, 'MÉDIA FINAL']
 df_final.loc[mask, 'Situação'] = 'Aprovado'
 
+
 # Excluir as colunas 'SITUAÇÃO FINAL' e 'MÉDIA FINAL' do df_merged
 df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
+
+# Carregar dados do Redash (para ter nota e tempo de prova do estudante)
+df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_08_13.csv")
+
+# Excluir valores que o tempo de prova foi 0 (zero) ou nulo
+df_redash = df_redash[
+    df_redash['tempo de prova'].notna() &
+    (df_redash['tempo de prova'].str.strip() != '') &
+    (df_redash['tempo de prova'] != '00:00:00')
+]
+
+# Criar a coluna 'MATRÍCULA' no df_redash, extraindo a matrícula do email do estudante
+df_redash['MATRÍCULA'] = df_redash['email_aluno'].str.split('@').str[0]
+
+
+# De acordo com a matrícula (extraída do email) e componente, juntar as informações de nota e tempo de prova do Redash com a base geral de estudantes em RAPP
+# Selecionar as colunas de interesse do df_redash
+df_redash_merge = df_redash[['MATRÍCULA', 'prova', 'rendimento (%)', 'tempo de prova']]
+
+
+# Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
+df_final["MATRÍCULA"] = (
+    df_final["MATRÍCULA"]
+    .astype("string")
+    .str.strip()
+)
+
+df_redash_merge["MATRÍCULA"] = (
+    df_redash_merge["MATRÍCULA"]
+    .astype("string")
+    .str.strip()
+)
+
+
+# Merge trazendo o rendimento do Redash com um nome temporário
+df_merged = df_final.merge(
+    df_redash_merge[['MATRÍCULA', 'prova', 'rendimento (%)', 'tempo de prova']],
+    left_on=['MATRÍCULA', 'COMPONENTE CURRICULAR'],
+    right_on=['MATRÍCULA', 'prova'],
+    how='left',
+    suffixes=('', '_redash')
+)
+
+# Substitui o rendimento do df_final pelo rendimento do Redash, somente quando houver valor no Redash
+df_merged['rendimento (%)'] = df_merged['rendimento (%)_redash'].fillna(
+    df_merged['rendimento (%)']
+)
+
+# Remove as colunas auxiliares
+df_merged = df_merged.drop(
+    columns=['prova', 'rendimento (%)_redash']
+)
+
+
+# Adiciona valores em Situação de acordo com o rendimento, exceto para os casos já aprovados vindos da Enturmação
+condicoes = [
+    df_merged['Situação'].eq('Aprovado'),
+    df_merged['rendimento (%)'].isna(),
+    df_merged['rendimento (%)'].ge(60)
+]
+
+valores = [
+    'Aprovado',
+    'Não Avaliado',
+    'Aprovado'
+]
+
+df_merged['Situação'] = np.select(
+    condicoes,
+    valores,
+    default='Não Aprovado'
+)
+
+
+# Reorganizar a ordem das colunas
+df_merged = df_merged[
+    ['MATRÍCULA',
+     'NOME', 
+     'COMPONENTE CURRICULAR',
+     'INEP ESCOLA',
+     'ESCOLA',
+     'SÉRIE',
+     'DIREC',
+     'ETAPA_RESUMIDA',
+     'rendimento (%)',
+     'tempo de prova',
+     'Situação',
+     'Enturmação']
+]
+
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_final.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260805_Monitoramento_RAPP.xlsx", index=False)
+df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260813_Monitoramento_RAPP.xlsx", index=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -756,7 +811,6 @@ with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260723_Ent
     df_rapp.to_excel(writer, sheet_name='Inicial', index=False)
     df_enturmados.to_excel(writer, sheet_name='Enturmados', index=False)
     resumo_direc.to_excel(writer, sheet_name='Tabela', index=False)
-
 
 
 
