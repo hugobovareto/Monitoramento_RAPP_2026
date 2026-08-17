@@ -1,5 +1,5 @@
 '''
-Objetivo: gerar 2 bases de dados em formato de planilha para serem usadas como fonte de dados para a aplicação em Google Apps Script para monitoramento dos estudantes em RAPP.
+Objetivo: gerar base de dados em formato de planilha para serem usadas como fonte de dados para a aplicação em Google Apps Script para monitoramento dos estudantes em RAPP.
 1ª base: Estudantes (base geral de todos componentes de todos estudantes em RAPP)
 Colunas:
 Matrícula (identificador único do estudante);
@@ -15,13 +15,6 @@ Rendimento;
 Tempo_Prova;
 Situação.
 
-
-2ª base: Informações inseridas pelo usuário (informação vai ser inserida por estudante e não por componente. Tavlez fosse bom dividir algumas informações para serem por componente, mas outras ficariam repetitivas, então fiz por estudante)
-Colunas:
-Matrícula (identificador único do estudante);
-Aluno contatado;
-Data_prevista;
-Comentários.
 
 São usadas as seguintes fontes de informação:
 - Base geral de estudantes em RAPP (advinda do GPD e após tratamentos);
@@ -82,13 +75,6 @@ Componente está aprovado se a nota (presente no redash for >= 60).
 Estudante com 'SITUAÇÃO FINAL' = APROVADO no Relatório de Acompanhamento de Turmas e Progressão Parcial é considerado aprovado, mesmo que não tenha feito a prova Plurall.
 A nota desse estudante será a nota em 'MÉDIA FINAL'.
 
-
-As colunas abaixo serão preenchidas pelo usuário da aplicação em Google Apps Script.
-Aluno contatado;
-Data_prevista;
-Comentários.
-
-
 '''
 # Importação das bibliotecas
 import pandas as pd
@@ -126,8 +112,7 @@ df_rapp = df_rapp[df_rapp['COMPONENTE CURRICULAR'].isin(componentes_bncc)]
 
 # Manunteção somente das colunas de interesse
 df_rapp = df_rapp[['MATRÍCULA', 'NOME', 'COMPONENTE CURRICULAR', 'INEP ESCOLA', 'ESCOLA', 'SÉRIE', 'DIREC', 'ETAPA_RESUMIDA']]
-
-
+        
 # Carregar dados dos Relatórios de Acompanhamento de Turmas e Progressão Parcial para saber enturmação e nota dos aprovados
 # caminho da pasta onde estão os arquivos
 pasta = r"C:\Users\hugob\Downloads\Enturmados_RAPP_2026"
@@ -227,6 +212,8 @@ df_enturmados = (
     .drop(columns='_prioridade')
     .reset_index(drop=True)
 )
+
+df_enturmados[df_enturmados['MATRÍCULA'] == '202530437969']
 
 
 # Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
@@ -344,7 +331,7 @@ df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 
 # Carregar dados do Redash (para ter nota e tempo de prova do estudante)
-df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_08_13.csv")
+df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_08_17.csv")
 
 # Excluir valores que o tempo de prova foi 0 (zero) ou nulo
 df_redash = df_redash[
@@ -357,10 +344,40 @@ df_redash = df_redash[
 df_redash['MATRÍCULA'] = df_redash['email_aluno'].str.split('@').str[0]
 
 
+# Matrículas no df_redash_merge que não estão no df_final
+df_matriculas_nao_encontradas = df_redash[
+    ~df_redash['MATRÍCULA'].isin(df_final['MATRÍCULA'])]
+
+
+# Pegar as informações do df_matriculas_nao_encontradas para trocar as matrículas no df_final nos casos que estiverem presentes no df_matriculas_nao_encontradas
+# Criar mapa somente com as informações necessárias
+df_mapa = df_matriculas_nao_encontradas[
+    ['MATRÍCULA', 'aluno', 'prova']
+].rename(columns={
+    'aluno': 'NOME',
+    'prova': 'COMPONENTE CURRICULAR',
+    'MATRÍCULA': 'MATRÍCULA_NOVA'
+})
+
+# Fazer o match usando NOME + COMPONENTE CURRICULAR
+df_final = df_final.merge(
+    df_mapa,
+    on=['NOME', 'COMPONENTE CURRICULAR'],
+    how='left'
+)
+
+# Trocar a matrícula SOMENTE quando houve match
+df_final['MATRÍCULA'] = df_final['MATRÍCULA_NOVA'].combine_first(
+    df_final['MATRÍCULA']
+)
+
+# Remover coluna auxiliar
+df_final = df_final.drop(columns='MATRÍCULA_NOVA')
+
+
 # De acordo com a matrícula (extraída do email) e componente, juntar as informações de nota e tempo de prova do Redash com a base geral de estudantes em RAPP
 # Selecionar as colunas de interesse do df_redash
 df_redash_merge = df_redash[['MATRÍCULA', 'prova', 'rendimento (%)', 'tempo de prova']]
-
 
 # Converter MATRÍCULA para string em ambos os dataframes para garantir que a junção funcione corretamente
 df_final["MATRÍCULA"] = (
@@ -374,7 +391,6 @@ df_redash_merge["MATRÍCULA"] = (
     .astype("string")
     .str.strip()
 )
-
 
 # Merge trazendo o rendimento do Redash com um nome temporário
 df_merged = df_final.merge(
@@ -433,9 +449,7 @@ df_merged = df_merged[
 ]
 
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260813_Monitoramento_RAPP.xlsx", index=False)
-
-
+df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260817_Monitoramento_RAPP.xlsx", index=False)
 
 
 
