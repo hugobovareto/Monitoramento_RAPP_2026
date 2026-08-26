@@ -580,9 +580,23 @@ df_agendamento = df_agendamento.rename(columns={
     'Agendou': 'AGENDOU'
 })
 
+# Criar coluna 'ETAPA_RESUMIDA' de acordo com os valores de Série
+mapeamento_etapa = {
+    '1ª série': 'Ensino Médio',
+    '2ª série': 'Ensino Médio',
+    '3ª série': 'Ensino Médio',
+    '6º ano': 'Ens. Fund. - Anos Finais',
+    '7º ano': 'Ens. Fund. - Anos Finais',
+    '8º ano': 'Ens. Fund. - Anos Finais',
+    '9º ano': 'Ens. Fund. - Anos Finais'
+    }
+
+df_agendamento['ETAPA_RESUMIDA'] = df_agendamento['SERIE'].map(mapeamento_etapa)
+
+
 # Trocar ordem das colunas
 df_agendamento = df_agendamento[
-    ['DIREC', 'ESCOLA', 'ID ESCOLA', 'TURMA', 'ID TURMA', 'AGENDOU', 'COMPONENTE', 'SERIE', 'AGENDAMENTO']
+    ['DIREC', 'ESCOLA', 'ID ESCOLA', 'TURMA', 'ID TURMA', 'AGENDOU', 'COMPONENTE', 'SERIE', 'ETAPA_RESUMIDA','AGENDAMENTO']
 ]
 
 # Salvar em Excel o dataframe
