@@ -487,6 +487,136 @@ df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260817_Moni
 
 
 
+##################################################################################
+'''
+Gerar uma planilha para alimentar a aplicação em Google Apps Script para monitoramento dos estudantes em RAPP, especificamente na página sobre o Agendamento das Avaliações.
+Dados granulados por Turma, de acordo com Redash.
+
+Colunas:
+DIREC;
+ESCOLA;
+ID ESCOLA;
+TURMA;
+ID TURMA;
+AGENDOU;
+COMPONENTE;
+SERIE
+AGENDAMENTO
+
+
+O 'AGENDAMENTO' apresenta a data de abertura, horário de abertura, data de fechamento e horário de fechamento.
+'''
+
+# Importação das bibliotecas
+import pandas as pd
+import glob
+import os
+from tqdm import tqdm  # Para barra de progresso
+import numpy as np
+import warnings
+warnings.filterwarnings('ignore')
+import openpyxl
+import re
+
+
+# Carregar os dados de agendamento (vindos do Redash)
+df_agendamento = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\[SEEC-RN]_Agendamento_de_Avaliações_por_turmas_2026_08_26.csv")
+
+
+# Separar a informação do "Nome da Avaliação" para ter o Componente e a Série
+# Excluir tudo a direita do último hífen (o texto é '1º ciclo')
+df_agendamento['Nome da Avaliação'] = (
+    df_agendamento['Nome da Avaliação']
+    .str.rsplit('-', n=1)
+    .str[0]
+    .str.strip()
+)
+
+# Excluir tudo a esquerda do 2º hífen (o texto é 'RAPP - RN')
+df_agendamento['Nome da Avaliação'] = (
+    df_agendamento['Nome da Avaliação']
+    .str.split('-', n=2)
+    .str[2]
+    .str.strip()
+)
+
+# Coluna de Componente com o que está a esquerda do hífen.
+# Coluna de Série com o que está a direita do hífen
+df_agendamento[['COMPONENTE', 'SERIE']] = (
+    df_agendamento['Nome da Avaliação']
+    .str.split('-', n=1, expand=True)
+)
+
+df_agendamento['COMPONENTE'] = df_agendamento['COMPONENTE'].str.strip()
+df_agendamento['SERIE'] = df_agendamento['SERIE'].str.strip()
+
+
+# Criar a coluna 'AGENDAMENTO' com a data e horário de abertura e fechamento
+df_agendamento['AGENDAMENTO'] = (
+    df_agendamento['Data de Abertura'] + ' ' + df_agendamento['Horário de Abertura'] + ' - ' + df_agendamento['Data de Fechamento'] + ' ' + df_agendamento['Horário de Fechamento']
+)
+
+
+# Excluir colunas que não serão usadas
+df_agendamento = df_agendamento.drop(columns=[
+    'Id Avaliação',
+    'Nome da Avaliação',
+    'CNPJ Escola',
+    'Bloco',
+    'Data de marcação do agendamento',
+    'Data de Abertura',
+    'Horário de Abertura',
+    'Data de Fechamento',
+    'Horário de Fechamento'])
+
+
+# Trocar os nomes das colunas
+df_agendamento = df_agendamento.rename(columns={
+    'Id escola': 'ID ESCOLA',
+    'Nome escola': 'ESCOLA',
+    'Grupo': 'DIREC', 
+    'Id Turma': 'ID TURMA',
+    'Nome Turma': 'TURMA',
+    'Agendou': 'AGENDOU'
+})
+
+# Trocar ordem das colunas
+df_agendamento = df_agendamento[
+    ['DIREC', 'ESCOLA', 'ID ESCOLA', 'TURMA', 'ID TURMA', 'AGENDOU', 'COMPONENTE', 'SERIE', 'AGENDAMENTO']
+]
+
+# Salvar em Excel o dataframe
+df_agendamento.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260826_Agendamento_RAPP.xlsx", index=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
