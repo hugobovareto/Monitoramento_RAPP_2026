@@ -225,12 +225,13 @@ df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 # Carregar dados do Redash (para ter nota e tempo de prova do estudante)
 df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_08_28.csv")
 
+# Código retirado, pois estudantes que realizam a prova antes da possibilidade de agendamento aparecem sem tempo de prova, mas as notas devem ser mantidas
 # Excluir valores que o tempo de prova foi 0 (zero) ou nulo
-df_redash = df_redash[
-    df_redash['tempo de prova'].notna() &
-    (df_redash['tempo de prova'].str.strip() != '') &
-    (df_redash['tempo de prova'] != '00:00:00')
-]
+# df_redash = df_redash[
+#     df_redash['tempo de prova'].notna() &
+#     (df_redash['tempo de prova'].str.strip() != '') &
+#     (df_redash['tempo de prova'] != '00:00:00')]
+
 
 # Criar a coluna 'MATRÍCULA' no df_redash, extraindo a matrícula do email do estudante
 df_redash['MATRÍCULA'] = df_redash['email_aluno'].str.split('@').str[0]
