@@ -578,6 +578,9 @@ escolas_0 = (
     .apply(lambda x: (~x).all())
 )
 
+# Quantidade de escolas com 0% de agendamento
+qtd_escolas_0 = escolas_0.sum()
+
 # Total de escolas
 qtd_escolas_total = escolas_0.shape[0]
 
