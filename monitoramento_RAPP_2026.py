@@ -413,7 +413,7 @@ import re
 
 
 # Carregar os dados de agendamento (vindos do Redash)
-df_agendamento = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\[SEEC-RN]_Agendamento_de_Avaliações_por_turmas_2026_08_26.csv")
+df_agendamento = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\[SEEC-RN]_Agendamento_de_Avaliações_por_turmas_2026_09_02.csv")
 
 
 # Separar a informação do "Nome da Avaliação" para ter o Componente e a Série
@@ -492,8 +492,157 @@ df_agendamento = df_agendamento[
     ['DIREC', 'ESCOLA', 'ID ESCOLA', 'TURMA', 'ID TURMA', 'AGENDOU', 'COMPONENTE', 'SERIE', 'ETAPA_RESUMIDA','AGENDAMENTO']
 ]
 
+
+
+############ LÓGICA DE CONTABILIZAÇÃO DE TURMAS E ESCOLAS AGENDADAS ############
+'''
+O dataframe é dividido em componentes e turmas por linhas.
+Uma turma tem vários componentes diferentes, ou seja, várias linhas.
+A turma para ser considerada 'Agendada' deve ter todos os componentes agendados.
+Para ser considerada 'Não Agendada' basta ter 1 componente não agendado.
+Escola 100% Agendada precisa de todas as turmas agendadas (em todos os componentes).
+Escola 0% Agendada precisa de todas as turmas não agendadas (ou seja, cada turma com pelo menos 1 componente não agendado).
+'''
+# Nº de Turmas Agendadas
+# Considerar uma turma agendada somente quando todos os registros (linhas) estiverem como AGENDOU = True
+turmas_agendadas = (
+    df_agendamento
+    .groupby(['ID ESCOLA', 'ID TURMA'])['AGENDOU']
+    .all()
+)
+
+# Quantidade de turmas agendadas
+qtd_turmas_agendadas = turmas_agendadas.sum()
+
+# Total de turmas
+qtd_turmas_total = turmas_agendadas.shape[0]
+
+# Percentual
+perc_turmas_agendadas = qtd_turmas_agendadas / qtd_turmas_total * 100
+
+print(f'Turmas agendadas: {qtd_turmas_agendadas}')
+print(f'Total de turmas: {qtd_turmas_total}')
+print(f'Percentual: {perc_turmas_agendadas:.2f}%')  
+
+# Dataframe dessas turmas
+turmas_agendadas_ids = turmas_agendadas[turmas_agendadas].index
+df_turmas_agendadas = df_agendamento[df_agendamento['ID TURMA'].isin(turmas_agendadas_ids)]
+
+
+# Situação de cada turma
+# Cria uma tabela com a situação de cada turma
+df_turmas = (
+    df_agendamento
+    .groupby(['ID ESCOLA', 'ID TURMA'])['AGENDOU']
+    .all()
+    .reset_index()
+)
+
+df_turmas = df_turmas.rename(columns={
+    'AGENDOU': 'TURMA_AGENDADA'
+})
+
+
+# Escolas com 100% de Agendamento
+escolas_100 = (
+    df_turmas
+    .groupby('ID ESCOLA')['TURMA_AGENDADA']
+    .all()
+)
+
+# Quantidade de escolas com 100% de agendamento
+qtd_escolas_100 = escolas_100.sum()
+
+# Total de escolas
+qtd_escolas_total = escolas_100.shape[0]
+
+# Percentual
+perc_escolas_100 = qtd_escolas_100 / qtd_escolas_total * 100
+
+print(f'Escolas com 100% de agendamento: {qtd_escolas_100}')
+print(f'Total de escolas: {qtd_escolas_total}')
+print(f'Percentual: {perc_escolas_100:.2f}%')
+
+
+# Dataframe dessas escolas
+escolas_100_ids = escolas_100[escolas_100].index
+df_escolas_100 = df_agendamento[
+    df_agendamento['ID ESCOLA'].isin(escolas_100_ids)
+]
+
+
+# Escolas com 0% de Agendamento
+escolas_0 = (
+    df_turmas
+    .groupby('ID ESCOLA')['TURMA_AGENDADA']
+    .apply(lambda x: (~x).all())
+)
+
+# Total de escolas
+qtd_escolas_total = escolas_0.shape[0]
+
+# Percentual
+perc_escolas_0 = qtd_escolas_0 / qtd_escolas_total * 100
+
+print(f'Escolas com 0% de agendamento: {qtd_escolas_0}')
+print(f'Total de escolas: {qtd_escolas_total}')
+print(f'Percentual: {perc_escolas_0:.2f}%')
+
+# Dataframe dessas escolas
+escolas_0_ids = escolas_0[escolas_0].index
+df_escolas_0 = df_agendamento[
+    df_agendamento['ID ESCOLA'].isin(escolas_0_ids)
+]
+
+
 # Salvar em Excel o dataframe
-df_agendamento.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260826_Agendamento_RAPP.xlsx", index=False)
+with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260902_Agendamento_RAPP.xlsx") as writer:
+    df_agendamento.to_excel(writer, sheet_name='Agendamento', index=False)
+    df_turmas_agendadas.to_excel(writer, sheet_name='Turmas Agendadas', index=False)
+    df_escolas_100.to_excel(writer, sheet_name='Escolas 100% Agendadas', index=False)
+    df_escolas_0.to_excel(writer, sheet_name='Escolas 0% Agendadas', index=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
