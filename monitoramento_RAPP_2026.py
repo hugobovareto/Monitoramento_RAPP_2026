@@ -525,8 +525,18 @@ print(f'Total de turmas: {qtd_turmas_total}')
 print(f'Percentual: {perc_turmas_agendadas:.2f}%')  
 
 # Dataframe dessas turmas
+# Recuperar os pares ID ESCOLA + ID TURMA das turmas agendadas
 turmas_agendadas_ids = turmas_agendadas[turmas_agendadas].index
-df_turmas_agendadas = df_agendamento[df_agendamento['ID TURMA'].isin(turmas_agendadas_ids)]
+
+# Transformar o MultiIndex em DataFrame
+df_ids_agendadas = turmas_agendadas_ids.to_frame(index=False)
+
+# Fazer o filtro usando ESCOLA + TURMA
+df_turmas_agendadas = df_agendamento.merge(
+    df_ids_agendadas,
+    on=['ID ESCOLA', 'ID TURMA'],
+    how='inner'
+)
 
 
 # Situação de cada turma
