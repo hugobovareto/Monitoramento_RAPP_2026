@@ -223,7 +223,7 @@ df_final = df_final.drop(columns=['SITUAÇÃO FINAL', 'MÉDIA FINAL'])
 
 
 # Carregar dados do Redash (para ter nota e tempo de prova do estudante)
-df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_08_28.csv")
+df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_-_Rendimento_e_participação_dos_alunos_p_provas_-_RAPP_-_Avaliações_em_andamento_2026_09_08.csv")
 
 # Código retirado, pois estudantes que realizam a prova antes da possibilidade de agendamento aparecem sem tempo de prova, mas as notas devem ser mantidas
 # Excluir valores que o tempo de prova foi 0 (zero) ou nulo
@@ -232,6 +232,11 @@ df_redash = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\SEEC-RN_
 #     (df_redash['tempo de prova'].str.strip() != '') &
 #     (df_redash['tempo de prova'] != '00:00:00')]
 
+# Trocar valor 'Língua Ingles' para 'Língua Inglesa' na coluna 'prova'
+df_redash.loc[df_redash['prova'].eq('Língua Ingles'), 'prova'] = 'Língua Inglesa'
+
+
+df_redash['prova'].unique()
 
 # Criar a coluna 'MATRÍCULA' no df_redash, extraindo a matrícula do email do estudante
 df_redash['MATRÍCULA'] = df_redash['email_aluno'].str.split('@').str[0]
@@ -342,7 +347,7 @@ df_merged = df_merged[
 ]
 
 # Exportar a base final em Excel para usar na aplicação em Google Apps Script
-df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260828_Monitoramento_RAPP.xlsx", index=False)
+df_merged.to_excel(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260908_Monitoramento_RAPP.xlsx", index=False)
 
 
 
@@ -413,7 +418,7 @@ import re
 
 
 # Carregar os dados de agendamento (vindos do Redash)
-df_agendamento = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\[SEEC-RN]_Agendamento_de_Avaliações_por_turmas_2026_09_02.csv")
+df_agendamento = pd.read_csv(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\[SEEC-RN]_Agendamento_de_Avaliações_por_turmas_2026_09_08.csv")
 
 
 # Separar a informação do "Nome da Avaliação" para ter o Componente e a Série
@@ -609,7 +614,7 @@ df_escolas_0 = df_agendamento[
 
 
 # Salvar em Excel o dataframe
-with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260902_Agendamento_RAPP.xlsx") as writer:
+with pd.ExcelWriter(r"D:\Scripts_Python\FGV\Monitoramento_RAPP_2026\20260908_Agendamento_RAPP.xlsx") as writer:
     df_agendamento.to_excel(writer, sheet_name='Agendamento', index=False)
     df_turmas_agendadas.to_excel(writer, sheet_name='Turmas Agendadas', index=False)
     df_escolas_100.to_excel(writer, sheet_name='Escolas 100% Agendadas', index=False)
